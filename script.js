@@ -46,7 +46,7 @@ async function getFetchData(endPoint, city) {
 }
 
 function getWeaatherIcon(id) {
-    if (id <= 232) return 'thunderstorm.png'
+    if (id <= 232) return 'thundrstorm.png'
     if (id <= 321) return 'rain.png'
     if (id <= 531) return 'rain.png'
     if (id <= 622) return 'snow.png'
