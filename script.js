@@ -1,145 +1,129 @@
-const cityInput = document.querySelector('.city-input')
-const searchBtn = document.querySelector('.search-btn')
+// === CONFIGURATION ===
+const apiKey = `9f7645323c621e977a39c1c2646fe724`;
+const baseUrl = `https://api.openweathermap.org/data/2.5/`;
+const defaultUnits = 'metric';
 
-const weatherInfoSection = document.querySelector('.weather-info')
-const notFoundSection = document.querySelector('.not-found')
-const searchCitySection = document.querySelector('.search-city')
+// === DOM SELECTORS ===
+const $ = (selector) => document.querySelector(selector);
 
-const countryTxt = document.querySelector('.country-txt')
-const tempTxt = document.querySelector('.temp-txt')
-const feelTxt=document.querySelector('.feel-txt')
-const maxTxt=document.querySelector('.maxtemp-txt')
-const minTxt=document.querySelector('.mintemp-txt')
-const conditionTxt = document.querySelector('.condition-txt')
-const humidityValueTxt = document.querySelector('.humidity-value-txt')
-const windValueTxt = document.querySelector('.wind-value-txt')
-const weatherSummaryImg = document.querySelector('.weather-summary-img')
-const currentDateTxt = document.querySelector('.current-date-txt')
+const dom = {
+    cityInput: $('.city-input'),
+    searchBtn: $('.search-btn'),
+    weatherInfo: $('.weather-info'),
+    notFound: $('.not-found'),
+    searchCity: $('.search-city'),
+    country: $('.country-txt'),
+    temp: $('.temp-txt'),
+    feel: $('.feel-txt'),
+    max: $('.maxtemp-txt'),
+    min: $('.mintemp-txt'),
+    condition: $('.condition-txt'),
+    humidity: $('.humidity-value-txt'),
+    wind: $('.wind-value-txt'),
+    summaryImg: $('.weather-summary-img'),
+    currentDate: $('.current-date-txt'),
+    forecastContainer: $('.forecast-items-container'),
+};
 
-const forecastItemsContainer = document.querySelector('.forecast-items-container')
+// === EVENT LISTENERS ===
+dom.searchBtn.addEventListener('click', handleSearch);
+dom.cityInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') handleSearch();
+});
 
-const apiKey =`9f7645323c621e977a39c1c2646fe724`
-
-searchBtn.addEventListener('click', () => {
-    if (cityInput.value.trim() != '') {
-        updateWeatherInfo(cityInput.value)
-        cityInput.value = ''
-        cityInput.blur()
+// === MAIN FUNCTIONS ===
+function handleSearch() {
+    const city = dom.cityInput.value.trim();
+    if (city) {
+        updateWeatherInfo(city);
+        dom.cityInput.value = '';
+        dom.cityInput.blur();
     }
-})
-cityInput.addEventListener('keydown', (event) => {
-    if (event.key == 'Enter' &&
-        cityInput.value.trim() != ''
-    ) {
-        updateWeatherInfo(cityInput.value)
-        cityInput.value = ''
-        cityInput.blur()
-    }
-})
-
-async function getFetchData(endPoint, city) {
-    const apiUrl = `https://api.openweathermap.org/data/2.5/${endPoint}?q=${city}&appid=${apiKey}&units=metric`
-
-    const response = await fetch(apiUrl)
-    
-    return response.json()
-}
-
-function getWeaatherIcon(id) {
-    if (id <= 232) return 'thundrstorm.png'
-    if (id <= 321) return 'rain.png'
-    if (id <= 531) return 'rain.png'
-    if (id <= 622) return 'snow.png'
-    if (id <= 781) return 'haze.png'
-    if (id <= 800) return 'sun.png'
-    else return 'cloud.png'
-}
-
-function getCurrentDate() {
-    const currentDate = new Date()
-    const options = {
-        weekday: 'short',
-        day: '2-digit',
-        month: 'short'
-    }
-    
-    return currentDate.toLocaleDateString('en-GB', options)
 }
 
 async function updateWeatherInfo(city) {
-    const weatherData = await getFetchData('weather', city)
-    
-    if (weatherData.cod != 200) {
-        showDisplaySection(notFoundSection)
-        return
-    }
-    
+    const data = await fetchWeather('weather', city);
+    if (data.cod !== 200) return showOnlySection(dom.notFound);
+
     const {
-        name: country,
-        main: { temp, humidity ,feels_like,temp_max,temp_min},
+        name,
+        main: { temp, feels_like, temp_max, temp_min, humidity },
         weather: [{ id, main }],
-        wind: { speed }
-    } = weatherData
+        wind: { speed },
+    } = data;
 
-    countryTxt.textContent = country
-    tempTxt.textContent = Math.round(temp) + ' °C'
-    feelTxt.textContent=Math.round(feels_like)+' °C'
-    maxTxt.textContent=Math.round(temp_max)+' °C'
-    minTxt.textContent=Math.round(temp_min)+' °C'
-    conditionTxt.textContent = main
-    humidityValueTxt.textContent = humidity + '%'
-    windValueTxt.textContent = speed + ' M/s'
+    updateText(dom.country, name);
+    updateText(dom.temp, `${Math.round(temp)} °C`);
+    updateText(dom.feel, `${Math.round(feels_like)} °C`);
+    updateText(dom.max, `${Math.round(temp_max)} °C`);
+    updateText(dom.min, `${Math.round(temp_min)} °C`);
+    updateText(dom.condition, main);
+    updateText(dom.humidity, `${humidity}%`);
+    updateText(dom.wind, `${speed} M/s`);
+    updateText(dom.currentDate, getCurrentDate());
+    dom.summaryImg.src = getWeatherIcon(id);
 
-    currentDateTxt.textContent = getCurrentDate()
-    weatherSummaryImg.src = `${getWeaatherIcon(id)}`
-
-    await updateForecastsInfo(city)
-    showDisplaySection(weatherInfoSection)
+    await updateForecast(city);
+    showOnlySection(dom.weatherInfo);
 }
 
-async function updateForecastsInfo(city) {
-    const forecastsData = await getFetchData('forecast', city)
+async function updateForecast(city) {
+    const data = await fetchWeather('forecast', city);
+    const timeFilter = '12:00:00';
+    const today = new Date().toISOString().split('T')[0];
 
-    const timeTaken = '12:00:00'
-    const todayDate = new Date().toISOString().split('T')[0]
+    dom.forecastContainer.innerHTML = '';
 
-    forecastItemsContainer.innerHTML = ''
-    forecastsData.list.forEach(forecastWeather => {
-        if (forecastWeather.dt_txt.includes(timeTaken) &&
-            !forecastWeather.dt_txt.includes(todayDate)) {
-            updateForecastItems(forecastWeather)
+    data.list.forEach(item => {
+        if (item.dt_txt.includes(timeFilter) && !item.dt_txt.includes(today)) {
+            dom.forecastContainer.insertAdjacentHTML('beforeend', createForecastHTML(item));
         }
-    })
+    });
 }
 
-function updateForecastItems(weatherData) {
-    const {
-        dt_txt: date,
-        weather: [{ id }],
-        main: { temp }
-    } = weatherData
+// === UTILITIES ===
+function updateText(element, value) {
+    element.textContent = value;
+}
 
-    const dateTaken = new Date(date)
-    const dateOption = {
+function showOnlySection(activeSection) {
+    [dom.weatherInfo, dom.searchCity, dom.notFound].forEach(section => {
+        section.style.display = 'none';
+    });
+    activeSection.style.display = 'flex';
+}
+
+function getCurrentDate() {
+    const options = { weekday: 'short', day: '2-digit', month: 'short' };
+    return new Date().toLocaleDateString('en-GB', options);
+}
+
+function getWeatherIcon(id) {
+    if (id <= 232) return 'thundrstorm.png';
+    if (id <= 531) return 'rain.png';
+    if (id <= 622) return 'snow.png';
+    if (id <= 781) return 'haze.png';
+    if (id === 800) return 'sun.png';
+    return 'cloud.png';
+}
+
+async function fetchWeather(endpoint, city) {
+    const url = `${baseUrl}${endpoint}?q=${city}&appid=${apiKey}&units=${defaultUnits}`;
+    const res = await fetch(url);
+    return res.json();
+}
+
+function createForecastHTML({ dt_txt, weather: [{ id }], main: { temp } }) {
+    const date = new Date(dt_txt).toLocaleDateString('en-US', {
         day: '2-digit',
-        month: 'short'
-    }
-    const dateResult = dateTaken.toLocaleDateString('en-US', dateOption)
+        month: 'short',
+    });
 
-    const forecastItem = `
+    return `
         <div class="forecast-item">
-            <h5 class="forecast-item-date regular-txt">${dateResult}</h5>
-            <img src="${getWeaatherIcon(id)}" class="forecast-item-img">
+            <h5 class="forecast-item-date regular-txt">${date}</h5>
+            <img src="${getWeatherIcon(id)}" class="forecast-item-img" />
             <h5 class="forecast-item-temp">${Math.round(temp)} °C</h5>
         </div>
-    `
-
-    forecastItemsContainer.insertAdjacentHTML('beforeend', forecastItem)
-}
-
-function showDisplaySection(section) {
-    [weatherInfoSection, searchCitySection, notFoundSection]
-        .forEach(section => section.style.display = 'none')
-
-    section.style.display = 'flex'
+    `;
 }
